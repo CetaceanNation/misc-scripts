@@ -2,6 +2,7 @@
 import argparse
 from bs4 import BeautifulSoup as bs
 from Crypto.Cipher import AES
+from datetime import datetime
 from enum import Enum
 import json
 import js2py
@@ -36,7 +37,7 @@ def print_log(component, message, level=LogLevel.BASIC, overwrite=False):
 def get_arguments():
     parser.add_argument("-V", "--verbose", action="store_true", help="print debugging information")
     parser.add_argument("-d", "--directory", type=str, help="save directory (defaults to current)", default=os.getcwd())
-    parser.add_argument("--skip-download", action="store_true", help="skip downloading the post")
+    parser.add_argument("--write-sidecars", action="store_true", help="write sidecars for urls, timestamps, tags and description notes")
     parser.add_argument("-f", "--format", type=str, help="video format, specified by NAME or the keyword \'best\'", default="best")
     parser.add_argument("-F", "--list-formats", action="store_true", help="list available formats")
     parser.add_argument("posts", metavar="POSTS", nargs="*", help="post url")
@@ -88,6 +89,7 @@ def get_post_data(post_id, soup):
     post_data["urls"] = [soup.link["href"]]
     post_data["basefilename"] = soup.link["href"].split("/")[-1]
     post_data["description"] = soup.find("div", class_="desc-container").get_text().strip("\n ")
+    post_data["timestamp"] = int(datetime.fromisoformat(str(soup.find("time")["datetime"])).timestamp)
     tags = []
     post_title_block = soup.find("div", class_="title-wrapper")
     tags.append("title:" + post_title_block.find("h1").string)
@@ -127,6 +129,11 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
     context_id = drm_session["id"]
     refresh_token = drm_session["token"]
     refresh_function = drm_session["function"]
+    output_file_name = f"{file_name}.{index}.mp4"
+    output_file_path = os.path.abspath(os.path.join(args.directory, output_file_name))
+    if os.path.isfile(output_file_path):
+        print_log(f"dl:{post_id}", "file exists, skipping download")
+        return output_file_path, post_data
     playlist_r = session.get(downloading_format["location"], headers={"Referer": referer_url})
     if not playlist_r.ok:
         print_log(f"dl:{post_id}", "failed to retrieve post playlist")
@@ -161,10 +168,8 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
             frag_file_name = os.path.abspath(os.path.join(args.directory, f"{file_name}.{len(frag_files)}.ts"))
             if write_frag(session, line, frag_file_name, key_context):
                 frag_files.append(frag_file_name)
-    output_file_name = f"{file_name}.{index}.mp4"
-    output_file_path = os.path.abspath(os.path.join(args.directory, output_file_name))
     # Use ffmpeg to concatenate all the fragments into a single output file
-    print_log("mpeg-convert", f"merging into {output_file_name}")
+    print_log(f"mpeg-convert:{post_id}", f"merging fragments")
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as frag_list:
         for frag_name in frag_files:
             frag_list.write(f"file '{frag_name}'\n")
@@ -175,7 +180,7 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
             ffmpeg_process = Popen(ffmpeg_list, stdout=PIPE, stderr=PIPE)
             stdout, stderr = ffmpeg_process.communicate()
         except Exception:
-            print_log("mpeg-convert", "failure in executing ffmpeg")
+            print_log(f"mpeg-convert:{post_id}", "failure in executing ffmpeg")
             print_log("ffmpeg", f"stdout: {str(stdout)}\n\nstderr: {str(stderr)}", LogLevel.VERBOSE)
             return
         frag_list.close()
@@ -184,7 +189,8 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
         for frag_name in frag_files:
             os.remove(frag_name)
         return output_file_path, post_data
-    print_log("mpeg-convert", "could not find output file")
+    print_log(f"mpeg-convert:{post_id}", "could not find output file")
+    return
 
 def download_video(session, index, post_data, content_soup):
     post_id = post_data["id"]
@@ -221,7 +227,6 @@ def download_video(session, index, post_data, content_soup):
     print_log(f"drm:{post_id}", f"activated drm context {context_id}", LogLevel.VERBOSE)
     drm_session["id"] = context_id
     # Extract refresh token from embed script
-    # TODO: reverse hashing function to make drm session pings possible
     token_m = re.search(PING_TOKEN_REGEX, iframe_script)
     if not token_m:
         print_log(f"info:{post_id}", "could not find ping refresh token in embed")
@@ -252,23 +257,36 @@ def download_image(session, index, post_data, content_soup):
     post_id = post_data["id"]
     file_name = post_data["basefilename"]
     image_url = content_soup.img["data-full-url"] if content_soup.img["data-full-url"] else content_soup["href"]
+    post_data["urls"].append(image_url)
     image_ext = os.path.splitext(urlparse.urlparse(image_url).path)[1]
     output_file_name = f"{file_name}.{index}{image_ext}"
     output_file_path = os.path.join(args.directory, output_file_name)
+    if os.path.isfile(output_file_path):
+        print_log(f"dl:{post_id}", "file exists, skipping download")
+        return output_file_path, post_data
     with open(output_file_path, "wb") as image_file:
         image_r = session.get(image_url)
         if not image_r.ok:
-            print_log(f"info:{post_id}", "failed to retrieve image content")
+            print_log(f"dl:{post_id}", "failed to retrieve image content")
             return
         image_file.write(image_r.content)
-    post_data["urls"].append(image_url)
     return output_file_path, post_data
 
 def write_sidecar(path, data):
     if path and data:
-        data["filename"] = os.path.basename(path)
-        with open(f"{path}.json", "w") as sidecar_file:
-            json.dump(data, sidecar_file, ensure_ascii=False, indent=4)
+        if len(data["urls"]) > 0:
+            with open(f"{path}.urls.txt", "w") as urls_sidecar:
+                for url in data["urls"]:
+                    urls_sidecar.write(f"{url}\n")
+        if data["timestamp"]:
+            with open(f"{path}.time.txt", "w") as ts_sidecar:
+                ts_sidecar.write(str(data["timestamp"]))
+        if len(data["tags"]) > 0:
+            with open(f"{path}.tags.json", "w") as tags_sidecar:
+                json.dump(data["tags"], tags_sidecar, ensure_ascii=False, indent=4)
+        if data["description"]:
+            with open(f"{path}.note.json", "w") as note_sidecar:
+                json.dump(["porn3dx description: " + data["description"]], note_sidecar, ensure_ascii=False, indent=4)
 
 def download_post(session, post_id, post_url):
     # Download page to extract iframe embed url
@@ -290,14 +308,14 @@ def download_post(session, post_id, post_url):
             case "videobox":
                 print_log(f"info:{post_id}", "getting video")
                 video_result = download_video(session, content_index, post_data, wrapper)
-                if video_result:
+                if video_result and args.write_sidecars:
                     video_path, post_data = video_result
                     write_sidecar(video_path, post_data)
                 content_index += 1
             case "example-image-link":
                 print_log(f"info:{post_id}", "getting image")
                 image_result = download_image(session, content_index, post_data, wrapper)
-                if image_result:
+                if image_result and args.write_sidecars:
                     image_path, post_data = image_result
                     write_sidecar(image_path, post_data)
                 content_index += 1

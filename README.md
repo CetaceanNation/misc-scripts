@@ -26,7 +26,7 @@ Downloads videos and images from posts on [Porn3dx](https://porn3dx.com). Video 
 <summary>Show Usage</summary>
 
 ```sh
-usage: porn3dx-downloader.py [-h] [-V] [-d DIRECTORY] [--skip-download] [-f FORMAT] [-F] [POSTS ...]
+usage: porn3dx-downloader.py [-h] [-V] [-d DIRECTORY] [--write-sidecars] [-f FORMAT] [-F] [POSTS ...]
 
 positional arguments:
   POSTS                 post url
@@ -36,7 +36,7 @@ options:
   -V, --verbose         print debugging information
   -d DIRECTORY, --directory DIRECTORY
                         save directory (defaults to current)
-  --skip-download       skip downloading the post
+  --write-sidecars      write sidecars for urls, timestamps, tags and description notes
   -f FORMAT, --format FORMAT
                         video format, specified by NAME or the keyword 'best'
   -F, --list-formats    list available formats
