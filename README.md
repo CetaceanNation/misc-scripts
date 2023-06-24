@@ -2,6 +2,7 @@
 Download art for a [MusicBrainz](https://musicbrainz.org/) release from the [Cover Art Archive](https://coverartarchive.org/)
 <details>
 <summary>Show Usage</summary>
+
 ```sh
 usage: caa-downloader.py [-h] [-d DIRECTORY] [-s SIZE] [RELEASES ...]
 
@@ -19,10 +20,35 @@ options:
 ```
 </details>
 
+## porn3dx-downloader
+Downloads videos and images from posts on [Porn3dx](https://porn3dx.com). Video formats available are better than those you can download with an account, expects and decrypts any encrypted video playlists. Very basic error handling/reporting.
+<details>
+<summary>Show Usage</summary>
+
+```sh
+usage: porn3dx-downloader.py [-h] [-V] [-d DIRECTORY] [--skip-download] [-f FORMAT] [-F] [POSTS ...]
+
+positional arguments:
+  POSTS                 post url
+
+options:
+  -h, --help            show this help message and exit
+  -V, --verbose         print debugging information
+  -d DIRECTORY, --directory DIRECTORY
+                        save directory (defaults to current)
+  --skip-download       skip downloading the post
+  -f FORMAT, --format FORMAT
+                        video format, specified by NAME or the keyword 'best'
+  -F, --list-formats    list available formats
+```
+</details>
+
 ## vrchat-asset-downloader
 Use the VRChat API to download assets. Only works with maps.
 <details>
 <summary>Show Usage</summary>
+
+```sh
 usage: vrchat-asset-downloader.py [-h] [-V] [-d DIRECTORY] [--write-thumbnail] [--write-json] [--dont-clean-json] [--verify] [--skip-download]
                                   [--revisions REVISIONS] [--list-revisions]
                                   [ASSET IDS ...]
@@ -43,4 +69,5 @@ options:
   --revisions REVISIONS
                         valid values are the keywords 'all' and 'latest', or the revision integer itself
   --list-revisions      list available revisions for the specified asset
+```
 </details>

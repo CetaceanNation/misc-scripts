@@ -1,0 +1,3 @@
+bs4
+js2py
+requests
