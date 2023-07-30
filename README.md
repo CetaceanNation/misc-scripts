@@ -43,6 +43,30 @@ options:
 ```
 </details>
 
+## twscraper-wrapper
+Scrapes tweets into jsonl format. This script makes use of [twscrape](https://github.com/vladkens/twscrape) to replicate the functional output of
+```sh
+snscrape --jsonl twitter-user <handle> >> file_name.tweets.json
+```
+Additional functionality such as sorting saved files and automatically identifying the last tweet saved limit search queries were added for convenience.
+<details>
+<summary>Show Usage</summary>
+
+```sh
+usage: twscrape-wrapper.py [-h] [-n] {save,sort} filename [handle]
+
+positional arguments:
+  {save,sort}  operation to perform. 'save' downloads tweets to a file, 'sort' re-orders tweets in a file.
+  filename     file prefix to write tweets to (will be appended with .tweets.json)
+  handle       handle of the account to download from
+
+options:
+  -h, --help   show this help message and exit
+  -n           prompt for overwriting the existing tweet file
+```
+
+</details>
+
 ## vrchat-asset-downloader
 Use the VRChat API to download assets. Only works with maps.
 <details>
