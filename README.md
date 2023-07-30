@@ -48,7 +48,7 @@ Scrapes tweets into jsonl format. This script makes use of [twscrape](https://gi
 ```sh
 snscrape --jsonl twitter-user <handle> >> file_name.tweets.json
 ```
-Additional functionality such as sorting saved files and automatically identifying the last tweet saved limit search queries were added for convenience.
+Before using, you must follow the instructions in the readme for twscrape to add at least one account to an `accounts.db` file in the same directory as the script. Additional functionality such as sorting saved files and automatically identifying the last tweet saved limit search queries were added for convenience.
 <details>
 <summary>Show Usage</summary>
 
