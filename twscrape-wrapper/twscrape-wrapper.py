@@ -79,7 +79,8 @@ async def gather_initial_tweets(api, account_handle):
 
 async def gather_tweets(api, account_handle, last_timestamp):
     tweets = []
-    last_datetime = datetime.datetime.fromtimestamp(last_timestamp)
+    # Subtract a day to try ensuring overlap, prevents <24 hour difference issues
+    last_datetime = datetime.datetime.fromtimestamp(last_timestamp) - datetime.timedelta(days=1)
     last_datetime_string = last_datetime.isoformat().replace("T", "_") + "_UTC"
     query_string = f"from:{account_handle} since:{last_datetime_string}"
     print(f"query: '{query_string}'")

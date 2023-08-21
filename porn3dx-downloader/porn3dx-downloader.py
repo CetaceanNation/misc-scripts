@@ -89,7 +89,7 @@ def get_post_data(post_id, soup):
     post_data["urls"] = [soup.link["href"]]
     post_data["basefilename"] = soup.link["href"].split("/")[-1]
     post_data["description"] = soup.find("div", class_="desc-container").get_text().strip("\n ")
-    post_data["timestamp"] = int(datetime.fromisoformat(str(soup.find("time")["datetime"])).timestamp)
+    post_data["timestamp"] = int(datetime.fromisoformat(str(soup.find("time")["datetime"])).timestamp())
     tags = []
     post_title_block = soup.find("div", class_="title-wrapper")
     tags.append("title:" + post_title_block.find("h1").string)
