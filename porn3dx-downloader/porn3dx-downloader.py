@@ -17,10 +17,22 @@ HOST = "https://porn3dx.com/"
 EMBED_HOST = "https://iframe.mediadelivery.net/"
 DRM_ACTIVATION_HOST = "https://video-987.mediadelivery.net/"
 HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/114.0"}
+
 POST_REGEX = r".*(?P<url>porn3dx\.com\/post\/(?P<id>\d+)).*"
 GUID_REGEX = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 PING_TOKEN_REGEX = r";setTimeout\(function\(\)\{var\ [a-z]=\"(?P<ping_token>" + GUID_REGEX + r")\";var\ [a-z]=(?P<secret_function>function\([a-z]+\)\{.*toLowerCase\(\)\});"
 PLAYLIST_REGEX = r"https?:\/\/iframe\.mediadelivery\.net\/" + GUID_REGEX + r"\/playlist.drm\?contextId=(?P<context_id>" + GUID_REGEX + r")&secret=" + GUID_REGEX
+
+    # 7/14/2022, 3:23:37 PM
+    # new Date(Date.UTC(2022, 6, 14, 15, 23, 37)).toLocaleString()
+XTIME_REGEX = r".*UTC\(((\d+(?:,\ )?)+)\).*"
+TAG_CATEGORY_REGEX = r".*bg-(\w+)-100.*"
+TAG_CATEGORY_MAP = {
+    "yellow": "series",
+    "green": "character",
+    "purple": "medium",
+    "blue": ""
+}
 
 class LogLevel(Enum):
     BASIC=1
@@ -83,30 +95,6 @@ def print_formats(formats_list):
         f"{format_settings['bandwidth']:<10} " +
         f"{format_settings['res']:<10} ")
 
-def get_post_data(post_id, soup):
-    post_data = {}
-    post_data["id"] = post_id
-    post_data["urls"] = [soup.link["href"]]
-    post_data["basefilename"] = soup.link["href"].split("/")[-1]
-    post_data["description"] = soup.find("div", class_="desc-container").get_text().strip("\n ")
-    post_data["timestamp"] = int(datetime.fromisoformat(str(soup.find("time")["datetime"])).timestamp())
-    tags = []
-    post_title_block = soup.find("div", class_="title-wrapper")
-    tags.append("title:" + post_title_block.find("h1").string)
-    tags.append("creator:" + post_title_block.find("a").string)
-    tag_block = soup.find("div", class_="tags-container")
-    for tag_span in tag_block.find_all("span", recursive=False):
-        tag_category = tag_span.span.text.lower()
-        if tag_category == "copyright":
-            tag_category = "series"
-        elif tag_category == "artist":
-            tag_category = "creator"
-        tag_category = tag_category + ":" if tag_category != "general" else ""
-        for tag_link in tag_span.find_all("a"):
-            tags.append(tag_category + tag_link.text)
-    post_data["tags"] = tags
-    return post_data
-
 def write_frag(session, frag_url, frag_name, key_context):
     try:
         with open(frag_name, "wb") as frag_file:
@@ -165,7 +153,7 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
                 print_log(f"drm:{post_id}", "failed to refresh the drm session, will continue but likely to fail if the video is long")
         elif not line.startswith("#"):
             # Write the fragment
-            frag_file_name = os.path.abspath(os.path.join(args.directory, f"{file_name}.{len(frag_files)}.ts"))
+            frag_file_name = os.path.abspath(os.path.join(args.directory, f"{file_name}.{index}.{len(frag_files)}.ts"))
             if write_frag(session, line, frag_file_name, key_context):
                 frag_files.append(frag_file_name)
     # Use ffmpeg to concatenate all the fragments into a single output file
@@ -194,7 +182,7 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
 
 def download_video(session, index, post_data, content_soup):
     post_id = post_data["id"]
-    iframe_url = content_soup.find("div", class_="video-block").iframe["src"]
+    iframe_url = content_soup.find("iframe")["src"]
     if not iframe_url:
         print_log(f"info:{post_id}", "could not find embed url in post page")
         return
@@ -256,7 +244,7 @@ def download_video(session, index, post_data, content_soup):
 def download_image(session, index, post_data, content_soup):
     post_id = post_data["id"]
     file_name = post_data["basefilename"]
-    image_url = content_soup.img["data-full-url"] if content_soup.img["data-full-url"] else content_soup["href"]
+    image_url = content_soup.find("picture").div.img["src"].strip()
     post_data["urls"].append(image_url)
     image_ext = os.path.splitext(urlparse.urlparse(image_url).path)[1]
     output_file_name = f"{file_name}.{index}{image_ext}"
@@ -272,21 +260,78 @@ def download_image(session, index, post_data, content_soup):
         image_file.write(image_r.content)
     return output_file_path, post_data
 
+def get_content_caption(post_data, content_soup):
+    caption_divs = content_soup.find_all("div", recursive=False)[1].find_all("div", recursive=False)
+    if len(caption_divs) > 1:
+        caption_text = caption_divs[1].string.strip()
+        post_data["description"].append("porn3dx caption: " + caption_text)
+
 def write_sidecar(path, data):
     if path and data:
         if len(data["urls"]) > 0:
             with open(f"{path}.urls.txt", "w") as urls_sidecar:
                 for url in data["urls"]:
                     urls_sidecar.write(f"{url}\n")
-        if data["timestamp"]:
+        if "timestamp" in data and data["timestamp"]:
             with open(f"{path}.time.txt", "w") as ts_sidecar:
                 ts_sidecar.write(str(data["timestamp"]))
-        if len(data["tags"]) > 0:
+        if "tags" in data and len(data["tags"]) > 0:
             with open(f"{path}.tags.json", "w") as tags_sidecar:
                 json.dump(data["tags"], tags_sidecar, ensure_ascii=False, indent=4)
-        if data["description"]:
+        if "description" in data and data["description"]:
             with open(f"{path}.note.json", "w") as note_sidecar:
-                json.dump(["porn3dx description: " + data["description"]], note_sidecar, ensure_ascii=False, indent=4)
+                json.dump(data["description"], note_sidecar, ensure_ascii=False, indent=4)
+
+def get_post_data(post_id, soup):
+    post_data = {}
+    post_data["id"] = post_id
+    canonical_url = soup.find("link", rel="canonical")["href"]
+    post_data["urls"] = [canonical_url]
+    post_data["basefilename"] = canonical_url.split("/")[-1]
+    # Info, Tags, Discussion, More
+    post_meta_divs = soup.find(id="aside-scroll").div.div.find_all("div", recursive=False)
+    # User, Like & Share, Description, Stats, Share
+    info_div = post_meta_divs[0].find_all("div", recursive=False)
+    tags = []
+    post_user_block = info_div[0]
+    post_desc_block = info_div[2]
+    tags.append("title:" + post_desc_block.find("h1").string.strip())
+    tags.append("creator:" + post_user_block.find_all("a")[1].string.strip())
+    desc_and_ts = post_desc_block.find_all("div", recursive=False)
+    ts_index = 0
+    post_data["description"] = []
+    if len(desc_and_ts) > 1:
+        ts_index = 1
+        for description_link in desc_and_ts[0].find_all("a"):
+            description_link.string = description_link["href"]
+        post_data["description"].append("porn3dx description: " + desc_and_ts[0].get_text().strip())
+    xtime_text = desc_and_ts[ts_index].span["x-text"]
+    date_text_m = re.search(XTIME_REGEX, xtime_text)
+    if not date_text_m:
+        print_log(f"info:{post_id}", f"failed parsing date '{xtime_text}'")
+        return None
+    date_values = list(map(int, date_text_m.group(1).split(", ")))
+    post_data["timestamp"] = int(datetime(date_values[0], date_values[1] + 1, date_values[2], date_values[3], date_values[4], date_values[5]).timestamp())
+    tag_block = post_meta_divs[1].find_all("div", recursive=False)[1]
+    for tag_link in tag_block.find_all("a", recursive=False):
+        tag_category = ""
+        tag_text = tag_link.string.strip()
+        for tag_class in tag_link["class"]:
+            tag_category_m = re.search(TAG_CATEGORY_REGEX, tag_class)
+            if not tag_category_m:
+                continue
+            category_color = tag_category_m.group(1)
+            if category_color in TAG_CATEGORY_MAP:
+                tag_category = TAG_CATEGORY_MAP[tag_category_m.group(1)]
+                break
+            else:
+                print_log(f"info:{post_id}", f"could not map tag category for tag '{tag_text}'")
+                break
+        tag_category = tag_category + ":" if tag_category else ""
+        tags.append(tag_category + tag_text)
+    post_data["tags"] = tags
+    print_log(f"info:{post_id}", f"post data: {post_data}", LogLevel.VERBOSE)
+    return post_data
 
 def download_post(session, post_id, post_url):
     # Download page to extract iframe embed url
@@ -297,28 +342,23 @@ def download_post(session, post_id, post_url):
         return
     page_soup = bs(post_page_r.content, "html.parser")
     post_data = get_post_data(post_id, page_soup)
-    post_contents = page_soup.find("div", class_="content-wrapper")
-    potential_content = post_contents.find_all("div", recursive=False) + post_contents.find_all("a", recursive=False)
-    other_media = post_contents.find("div", class_="other-media")
-    if other_media:
-        potential_content += other_media.find_all("div", recursive=False) + other_media.find_all("a", recursive=False)
+    if not post_data:
+        print_log(f"info:{post_id}", "failed parsing post data")
+        return
+    post_contents = page_soup.find("main", id="postView").find_all("div", recursive=False)[1].find("div", recursive=False).find_all("div", recursive=False)
     content_index = 0
-    for wrapper in potential_content:
-        match wrapper["class"][0]:
-            case "videobox":
-                print_log(f"info:{post_id}", "getting video")
-                video_result = download_video(session, content_index, post_data, wrapper)
-                if video_result and args.write_sidecars:
-                    video_path, post_data = video_result
-                    write_sidecar(video_path, post_data)
-                content_index += 1
-            case "example-image-link":
-                print_log(f"info:{post_id}", "getting image")
-                image_result = download_image(session, content_index, post_data, wrapper)
-                if image_result and args.write_sidecars:
-                    image_path, post_data = image_result
-                    write_sidecar(image_path, post_data)
-                content_index += 1
+    for content in post_contents:
+        if content.find("iframe"):
+            print_log(f"info:{post_id}", "getting video")
+            content_result = download_video(session, content_index, post_data.copy(), content)
+        elif content.find("picture"):
+            print_log(f"info:{post_id}", "getting image")
+            content_result = download_image(session, content_index, post_data.copy(), content)
+        if content_result and args.write_sidecars:
+            content_path, content_post_data = content_result
+            get_content_caption(content_post_data, content)
+            write_sidecar(content_path, content_post_data)
+        content_index += 1
 
 def main():
     if len(args.posts) == 0:
