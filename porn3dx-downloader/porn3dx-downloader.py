@@ -137,6 +137,7 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
             key_r = session.get(key_attr["URI"], headers={"Origin": EMBED_HOST, "Referer": EMBED_HOST})
             if not key_r.ok:
                 print_log(f"key-context:{post_id}", "failed to retrieve key for segments")
+                continue
             key_bytes = key_r.content
             iv_bytes = bytearray.fromhex(key_attr["IV"][2:])
             print_log(f"key-context:{post_id}", f"new key context [IV: {iv_bytes.hex()}, K: {key_bytes.hex()}]", LogLevel.VERBOSE)
@@ -217,7 +218,7 @@ def download_video(session, index, post_data, content_soup):
     # Extract refresh token from embed script
     token_m = re.search(PING_TOKEN_REGEX, iframe_script)
     if not token_m:
-        print_log(f"info:{post_id}", "could not find ping refresh token in embed")
+        print_log(f"drm:{post_id}", "could not find ping refresh token in embed")
         return
     drm_session["token"] = token_m.group("ping_token")
     secret_script = token_m.group("secret_function")
