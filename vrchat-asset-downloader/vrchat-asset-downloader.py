@@ -136,7 +136,6 @@ def download_asset(a_type, a_id, s, api_key):
             if os.path.isfile(json_filepath):
                 os.remove(json_filepath)
             os.rename(f"{json_filepath}.tmp", json_filepath)
-        
         if image_j and args.write_thumbnail:
             download_file_from_json(image_j, save_dir, s)
         if asset_j and not args.skip_download:
@@ -250,7 +249,6 @@ def main():
     api_session = sessions.BaseUrlSession(base_url=API_URL)
     api_session.headers = HEADERS
     api_key = get_auth(api_session)
-    #return
     api_key_t = {"apiKey": api_key}
     for asset_id in args.asset_id_list:
         asset_type_m = re.search(ASSET_REGEX, asset_id)
@@ -259,7 +257,6 @@ def main():
             download_asset(ASSET_TYPES[asset_type], asset_id, api_session, api_key_t)
         else:
             print_log("vrchat-asset-downloader", f"id {asset_id} does not appear to be valid")
-            
 
 parser = argparse.ArgumentParser()
 args = get_arguments()
