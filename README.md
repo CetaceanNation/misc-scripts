@@ -53,16 +53,17 @@ Before using, you must follow the instructions in the readme for twscrape to add
 <summary>Show Usage</summary>
 
 ```sh
-usage: twscrape-wrapper.py [-h] [-n] {save,sort,dedupe} filename [handle]
+usage: twscrape-wrapper.py [-h] [-n] {save,save-past,sort,dedupe} filename [handle]
 
 positional arguments:
-  {save,sort,dedupe}  operation to perform. 'save' downloads tweets to a file, 'sort' re-orders tweets in a file, 'dedupe' removes entries with duplicate ids.
-  filename            file prefix to write tweets to (will be appended with .tweets.json)
-  handle              handle of the account to download from
+  {save,save-past,sort,dedupe}
+                        operation to perform. 'save' downloads tweets to a file ('save-past' works in reverse), 'sort' re-orders tweets in a file, 'dedupe' removes entries with duplicate ids.
+  filename              file prefix to write tweets to (will be appended with .tweets.json)
+  handle                handle of the account to download from
 
 options:
-  -h, --help   show this help message and exit
-  -n           prompt for overwriting the existing tweet file
+  -h, --help            show this help message and exit
+  -n                    prompt for overwriting the existing tweet file
 ```
 
 </details>
