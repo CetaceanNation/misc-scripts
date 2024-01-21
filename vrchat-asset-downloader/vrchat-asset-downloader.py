@@ -180,7 +180,7 @@ def download_file_from_json(file_j, save_dir, s):
     for dl_num, dl_ver in enumerate(get_versions):
         cur_j = file_j["versions"][dl_ver]["file"]
         file_path = os.path.join(save_dir, cur_j["fileName"])
-        if (os.path.isfile(file_path)):
+        if os.path.isfile(file_path):
             print_log("file", f"'{cur_j['fileName']}' already exists")
         else:
             s.headers["Host"] = "api.vrchat.cloud"

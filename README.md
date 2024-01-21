@@ -64,6 +64,7 @@ positional arguments:
 options:
   -h, --help            show this help message and exit
   -n                    prompt for overwriting the existing tweet file
+  --download-media, -m  iterate through scraped/sorted tweets and download all media
 ```
 
 </details>
