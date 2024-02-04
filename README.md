@@ -70,7 +70,7 @@ options:
 </details>
 
 ## vrchat-asset-downloader
-Use the VRChat API to download assets. Only works with maps.
+Use the [VRChat](https://vrchat.com/home) API to download assets. Only works with maps.
 <details>
 <summary>Show Usage</summary>
 
@@ -99,7 +99,7 @@ options:
 </details>
 
 ## vroid-hub-downloader
-Downloads preview models from VRoid Hub. Handles decryption and decompression (assist from bin).
+Downloads preview models from [VRoid Hub](https://hub.vroid.com/). Handles decryption and decompression (assist from bin).
 <details>
 <summary>Show Usage</summary>
 
