@@ -15,7 +15,7 @@ from twscrape.logger import set_log_level
 OPERATIONS = ["save", "save-past", "sort", "dedupe"]
 KEY_ORDER_TWEET = ["_type", "url", "date", "rawContent", "renderedContent", "id", "user", "replyCount", "retweetCount", "likeCount", "quoteCount", "conversationId", "lang", "source", "sourceUrl", "sourceLabel", "links", "media", "retweetedTweet", "quotedTweet", "inReplyToTweetId", "inReplyToUser", "mentionedUsers", "coordinates", "place", "hashtags", "cashtags", "card", "viewCount", "vibe", "content", "outlinks", "outlinksss", "tcooutlinks", "tcooutlinksss", "username"]
 KEY_ORDER_USER = ["_type", "username", "id", "displayname", "rawDescription", "renderedDescription", "descriptionLinks", "verified", "created", "followersCount", "friendsCount", "statusesCount", "favouritesCount", "listedCount", "mediaCount", "location", "protected", "link", "profileImageUrl", "profileBannerUrl", "label", "description", "descriptionUrls", "linkTcourl", "linkUrl", "url"]
-BACKWARDS_INTERVAL = 60
+BACKWARDS_INTERVAL = 120
 MEDIA_HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/114.0"}
 MEDIA_IMAGE_NAMES = ["orig", "large", "medium", "900x900", "small", "thumb"]
 
@@ -243,12 +243,12 @@ async def main():
         print(f"getting tweets from account {account_handle}")
         saved_tweets = get_saved_tweets(filepath)
         last_saved_tweet_date, last_saved_tweet_id = get_last_tweet(saved_tweets)
-        last_saved_datetime = datetime.datetime.fromtimestamp(last_saved_tweet_date)
         tweets_gathered = []
         if last_saved_tweet_date < 0:
             print("no previous tweets, creating new file")
             tweets_gathered = await gather_initial_tweets(api, account_handle)
         else:
+            last_saved_datetime = datetime.datetime.fromtimestamp(last_saved_tweet_date)
             print(f"retrieving tweets {'since' if since else 'until'} {last_saved_datetime.isoformat()}")
             if since:
                 tweets_gathered = await gather_tweets(api, account_handle, last_saved_tweet_date)
