@@ -49,6 +49,8 @@ Scrapes tweets into jsonl format. This script makes use of [twscrape](https://gi
 snscrape --jsonl twitter-user <handle> >> file_name.tweets.json
 ```
 Before using, you must follow the instructions in the readme for twscrape to add at least one account to an `accounts.db` file in the same directory as the script. Additional functionality such as sorting saved files and automatically identifying the last tweet saved to limit search queries were added for convenience.
+
+*Unfortunately, retweets are only able to be retrieved from an initial profile scrape. [Advanced search](https://github.com/igorbrigadir/twitter-advanced-search) queries (used with the `save-past` operation) are unable to retrieve retweets properly with modern twitter beyond ~10 days from the present for undocumented reasons. See [#2](https://github.com/CetaceanNation/misc-scripts/issues/2).*
 <details>
 <summary>Show Usage</summary>
 
