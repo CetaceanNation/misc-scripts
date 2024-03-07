@@ -49,35 +49,40 @@ def download_preview_model(model_id):
         return None
     return io.BytesIO(model_r.content)
 
-def decrypt_decompress_model(model_bytes, model_filename):
-    with open(model_filename, "wb") as dec_vrm:
-        iv_bytes = model_bytes.read(16)
-        key_bytes = model_bytes.read(32)
-        key_context = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
-        enc_data = model_bytes.read()
-        dec_data = unpad(key_context.decrypt(enc_data))[4:]
-        dctx = zstandard.ZstdDecompressor()
-        with dctx.stream_writer(dec_vrm) as decompressor:
-            decompressor.write(dec_data)
-    print(f"wrote decrypted and decompressed model '{os.path.basename(model_filename)}'")
+def decrypt_decompress_model(model_id, model_bytes, model_filename):
+    if not os.path.isfile(model_filename):
+        with open(model_filename, "wb") as dec_vrm:
+            iv_bytes = model_bytes.read(16)
+            key_bytes = model_bytes.read(32)
+            key_context = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
+            enc_data = model_bytes.read()
+            dec_data = unpad(key_context.decrypt(enc_data))[4:]
+            dctx = zstandard.ZstdDecompressor()
+            with dctx.stream_writer(dec_vrm) as decompressor:
+                decompressor.write(dec_data)
+        print(f"[model:{model_id}] wrote decrypted and decompressed model '{os.path.basename(model_filename)}'")
+    else:
+        print(f"[model:{model_id}] '{os.path.basename(model_filename)}' already exists")
 
 def download_model_from_vroid(model_id, subdir=None):
     model_path_base = os.path.join(subdir if subdir else args.directory, model_id)
     model_api_url = f"{HOST}/api/character_models/{model_id}"
-    if args.write_info_json:
+    json_path = f"{model_path_base}.info.json"
+    if args.write_info_json and not os.path.isfile(json_path):
         model_api_r = requests.get(model_api_url, headers={"User-Agent": USER_AGENT, "X-Api-Version": API_VERSION})
         if not model_api_r.ok:
             print(f"[model:{model_id}:api] got bad response from vroid hub, {model_r.status_code}")
         else:
             model_api_j = model_api_r.json()
-            json_path = f"{model_path_base}.info.json"
             with open(json_path, "w") as json_file:
                 json_file.write(json.dumps(model_api_j["data"]))
             print(f"[model:{model_id}:api] wrote '{os.path.basename(json_path)}'")
+    else:
+        print(f"[model:{model_id}:api] '{os.path.basename(json_path)}' already exists")
     enc_vrm = download_preview_model(model_id)
     if not enc_vrm:
         return
-    decrypt_decompress_model(enc_vrm, f"{model_path_base}.{MODEL_FILE_EXT}")
+    decrypt_decompress_model(model_id, enc_vrm, f"{model_path_base}.{MODEL_FILE_EXT}")
 
 def download_user_from_vroid(user_id):
     user_api_url = f"{HOST}/api/users/{user_id}"
@@ -88,9 +93,10 @@ def download_user_from_vroid(user_id):
     user_api_j = user_api_r.json()
     username = user_api_j["data"]["user"]["name"]
     user_base_path = os.path.join(args.directory, f"{username} ({user_id})")
-    os.makedirs(user_base_path)
+    if not os.path.isdir(user_base_path):
+        os.makedirs(user_base_path)
+    json_path = f"{user_base_path}.info.json"
     if args.write_info_json:
-        json_path = f"{user_base_path}.info.json"
         with open(json_path, "w") as json_file:
             json_file.write(json.dumps(user_api_j["data"]))
         print(f"[user:{user_id}:api] wrote '{os.path.basename(json_path)}'")
