@@ -45,7 +45,7 @@ def download_preview_model(model_id):
     model_r = requests.get(model_preview_url, allow_redirects=True, headers={"User-Agent": USER_AGENT, "X-Api-Version": API_VERSION})
     if not model_r.ok:
         print(f"[model:{model_id}:preview] got bad response from vroid hub, {model_r.status_code}")
-        print(model_r.content)
+        print(f"[model:{model_id}:preview] {model_r.content.decode()}")
         return None
     return io.BytesIO(model_r.content)
 
@@ -68,17 +68,21 @@ def download_model_from_vroid(model_id, subdir=None):
     model_path_base = os.path.join(subdir if subdir else args.directory, model_id)
     model_api_url = f"{HOST}/api/character_models/{model_id}"
     json_path = f"{model_path_base}.info.json"
+    model_api_r = requests.get(model_api_url, headers={"User-Agent": USER_AGENT, "X-Api-Version": API_VERSION})
+    if not model_api_r.ok:
+        print(f"[model:{model_id}:api] got bad response from vroid hub, {model_r.status_code}")
+        return
+    model_api_j = model_api_r.json()["data"]
     if args.write_info_json and not os.path.isfile(json_path):
-        model_api_r = requests.get(model_api_url, headers={"User-Agent": USER_AGENT, "X-Api-Version": API_VERSION})
-        if not model_api_r.ok:
-            print(f"[model:{model_id}:api] got bad response from vroid hub, {model_r.status_code}")
-        else:
-            model_api_j = model_api_r.json()
-            with open(json_path, "w") as json_file:
-                json_file.write(json.dumps(model_api_j["data"]))
-            print(f"[model:{model_id}:api] wrote '{os.path.basename(json_path)}'")
+        with open(json_path, "w") as json_file:
+            json_file.write(json.dumps(model_api_j))
+        print(f"[model:{model_id}:api] wrote '{os.path.basename(json_path)}'")
     else:
         print(f"[model:{model_id}:api] '{os.path.basename(json_path)}' already exists")
+    if not "conversion_state" in model_api_j["character_model"]["latest_character_model_version"]:
+        print(f"[model:{model_id}:api] warning: JSON response implies model preview does not exist, expecting 404")
+    elif model_api_j["character_model"]["latest_character_model_version"]["conversion_state"]["current_state"] != "completed":
+        print(f"[model:{model_id}:api] warning: JSON response implies model preview is not ready, expecting 404")
     enc_vrm = download_preview_model(model_id)
     if not enc_vrm:
         return
