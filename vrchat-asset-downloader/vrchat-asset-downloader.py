@@ -19,7 +19,8 @@ HEADERS = {"Host": "vrchat.com", "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; 
 GUID_REGEX = r"_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 ASSET_REGEX = r"^(?P<asset_type>wrld)" + GUID_REGEX + r"$"
 FILE_REGEX = r"^https?:\/\/api\.vrchat\.cloud\/api\/1\/file\/(?P<file_id>file" + GUID_REGEX + r")\/[0-9]+\/file$"
-CLEAN_FILENAME_KINDA=r"[^\w\-_\. \[\]\(\)]"
+CLEAN_FILENAME_WIN=r"[^\w\-_\. \[\]\(\)]"
+CLEAN_FILENAME_POS=r"[\/]"
 BLOCK_SIZE = 1024
 REMOVE_FROM_JSON = ["favorites", "visits", "popularity", "heat", "publicOccupants", "privateOccupants", "occupants", "instances"]
 ASSET_TYPES = {"wrld": "world", "avtr": "avatar"}
@@ -29,7 +30,10 @@ class LogLevel(Enum):
     VERBOSE=2
 
 def clean_filename(path):
-    return re.sub(CLEAN_FILENAME_KINDA, "_", path)
+    if os.name == "nt":
+        return re.sub(CLEAN_FILENAME_WIN, "_", path)
+    else:
+        return re.sub(CLEAN_FILENAME_WIN, "_", path)
 
 def get_auth(s):
     config_r = s.get(f"config")
@@ -122,11 +126,11 @@ def download_asset(a_type, a_id, s, api_key):
         list_file_versions(file_j)
         return
     else:
-        save_dir = os.path.join(args.directory, asset_j["name"])
+        save_dir = os.path.join(args.directory, clean_filename(asset_j["name"]))
         if not os.path.isdir(save_dir):
             os.makedirs(save_dir)
         if args.write_json:
-            json_filename = f"{a_id}.json"
+            json_filename = clean_filename(f"{a_id}.json")
             json_filepath = os.path.join(save_dir, json_filename)
             if os.path.isfile(f"{json_filepath}.tmp"):
                 os.remove(f"{json_filepath}.tmp")
@@ -179,7 +183,7 @@ def download_file_from_json(file_j, save_dir, s):
     print_log("file", f"Downloading {file_j['name']}")
     for dl_num, dl_ver in enumerate(get_versions):
         cur_j = file_j["versions"][dl_ver]["file"]
-        file_path = os.path.join(save_dir, cur_j["fileName"])
+        file_path = os.path.join(save_dir, clean_filename(cur_j["fileName"]))
         if os.path.isfile(file_path):
             print_log("file", f"'{cur_j['fileName']}' already exists")
         else:
