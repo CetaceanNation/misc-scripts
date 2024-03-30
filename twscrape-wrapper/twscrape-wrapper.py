@@ -75,7 +75,7 @@ def dedupe_tweets(tweets):
     return filtered_tweets
 
 def get_last_tweet(tweets, since=True):
-    last_tweet_date = -1
+    last_tweet_date = datetime.datetime.fromisoformat(tweets[0]["date"]).timestamp()
     last_tweet_id = None
     for tweet in tweets:
         current_tweet_date = datetime.datetime.fromisoformat(tweet["date"]).timestamp()
@@ -242,7 +242,7 @@ async def main():
             sys.exit(1)
         print(f"getting tweets from account {account_handle}")
         saved_tweets = get_saved_tweets(filepath)
-        last_saved_tweet_date, last_saved_tweet_id = get_last_tweet(saved_tweets)
+        last_saved_tweet_date, last_saved_tweet_id = get_last_tweet(saved_tweets, since)
         tweets_gathered = []
         if last_saved_tweet_date < 0:
             print("no previous tweets, creating new file")
