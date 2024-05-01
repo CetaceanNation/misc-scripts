@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 from bs4 import BeautifulSoup as bs
+import copy
 from Crypto.Cipher import AES
 from datetime import datetime
 from enum import Enum
@@ -69,7 +70,7 @@ def get_m3u8_info(session, playlist_url, referer_url):
         if line.startswith("#EXT-X-STREAM-INF:"):
             # parse format details
             format_details = parse_m3u8_attributes(line)
-        elif not line.startswith("#"):
+        elif not line.startswith("#") and len(line.strip()) > 0:
             if format_details:
                 if "RESOLUTION" in format_details:
                     media_name = format_details["RESOLUTION"].split("x")[1] + "p"
@@ -297,7 +298,7 @@ def get_post_data(post_id, soup):
     post_user_block = info_div[0]
     post_desc_block = info_div[2]
     tags.append("title:" + post_desc_block.find("h1").string.strip())
-    tags.append("creator:" + post_user_block.find_all("a")[1].string.strip())
+    tags.append("creator:" + post_user_block.find_all("a")[-1].string.strip()[1:])
     desc_and_ts = post_desc_block.find_all("div", recursive=False)
     ts_index = 0
     post_data["description"] = []
@@ -312,7 +313,7 @@ def get_post_data(post_id, soup):
         print_log(f"info:{post_id}", f"failed parsing date '{xtime_text}'")
         return None
     date_values = list(map(int, date_text_m.group(1).split(", ")))
-    post_data["timestamp"] = int(datetime(date_values[0], date_values[1] + 1, date_values[2], date_values[3], date_values[4], date_values[5]).timestamp())
+    post_data["timestamp"] = int(datetime(date_values[0], (date_values[1] + 1) % 11, date_values[2], date_values[3], date_values[4], date_values[5]).timestamp())
     tag_block = post_meta_divs[1].find_all("div", recursive=False)[1]
     for tag_link in tag_block.find_all("a", recursive=False):
         tag_category = ""
@@ -327,6 +328,7 @@ def get_post_data(post_id, soup):
                 break
             else:
                 print_log(f"info:{post_id}", f"could not map tag category for tag '{tag_text}'")
+                print_log(f"info:{post_id}", f"tag category for tag '{tag_text}' resolves to color '{category_color}'")
                 break
         tag_category = tag_category + ":" if tag_category else ""
         tags.append(tag_category + tag_text)
@@ -351,10 +353,10 @@ def download_post(session, post_id, post_url):
     for content in post_contents:
         if content.find("iframe"):
             print_log(f"info:{post_id}", "getting video")
-            content_result = download_video(session, content_index, post_data.copy(), content)
+            content_result = download_video(session, content_index, copy.deepcopy(post_data), content)
         elif content.find("picture"):
             print_log(f"info:{post_id}", "getting image")
-            content_result = download_image(session, content_index, post_data.copy(), content)
+            content_result = download_image(session, content_index, copy.deepcopy(post_data), content)
         if content_result and args.write_sidecars:
             content_path, content_post_data = content_result
             get_content_caption(content_post_data, content)
