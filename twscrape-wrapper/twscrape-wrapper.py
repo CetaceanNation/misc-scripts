@@ -75,7 +75,10 @@ def dedupe_tweets(tweets):
     return filtered_tweets
 
 def get_last_tweet(tweets, since=True):
-    last_tweet_date = datetime.datetime.fromisoformat(tweets[0]["date"]).timestamp()
+    if len(tweets) > 0:
+        last_tweet_date = datetime.datetime.fromisoformat(tweets[0]["date"]).timestamp()
+    else:
+        last_tweet_date = -1
     last_tweet_id = None
     for tweet in tweets:
         current_tweet_date = datetime.datetime.fromisoformat(tweet["date"]).timestamp()
