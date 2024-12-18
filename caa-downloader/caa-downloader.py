@@ -14,6 +14,7 @@ API = "http://coverartarchive.org/release/"
 RELEASE_REGEX = r"^(?:(?:https?:\/\/)?(?:.*?\.)?musicbrainz\.org\/release\/)?(?P<release_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/.+)?$"
 BLOCK_SIZE = 1024
 
+
 def download_image(i_url, filename):
     file_path = os.path.join(args.directory, filename)
     file_r = requests.get(i_url, stream=True, allow_redirects=True)
@@ -22,13 +23,14 @@ def download_image(i_url, filename):
     total_size = int(file_r.headers['content-length'])
     term_width = shutil.get_terminal_size((80, 20))[0]
     with tqdm.wrapattr(open(file_path, "wb"), "write",
-        desc=f"{filename}", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}{postfix}]",
-        ncols=int(term_width * 0.8), total=total_size,
-        unit="B", unit_scale=True, unit_divisor=BLOCK_SIZE
-    ) as file_h:
+                       desc=f"{filename}", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}{postfix}]",
+                       ncols=int(term_width * 0.8), total=total_size,
+                       unit="B", unit_scale=True, unit_divisor=BLOCK_SIZE
+                       ) as file_h:
         for chunk in file_r.iter_content(BLOCK_SIZE):
             file_h.write(chunk)
     return
+
 
 def download_covers(s, r_id):
     print(f"requesting art for {r_id}")
@@ -54,6 +56,7 @@ def download_covers(s, r_id):
         download_image(image_url, filename_clean)
     print(f"finished retrieving art for {r_id}")
 
+
 def main():
     if len(args.release_list) == 0:
         parser.print_usage()
@@ -72,10 +75,14 @@ def main():
         else:
             print(f"could not parse release id from '{release}'")
 
+
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument("-d", "--directory", type=str, help="save directory (defaults to current)", default=os.getcwd())
-parser.add_argument("-s", "--size", type=str, default="original", help="image download size (250, 500, 1200, original)")
-parser.add_argument("release_list", metavar="RELEASES", nargs="*", help="releases to download i.e.\n3791c620-7ba4-3db0-bda8-2b060f31a7b8\nhttps://musicbrainz.org/release/3791c620-7ba4-3db0-bda8-2b060f31a7b8\nbeta.musicbrainz.org/release/3791c620-7ba4-3db0-bda8-2b060f31a7b8/discids")
+parser.add_argument("-d", "--directory", type=str,
+                    help="save directory (defaults to current)", default=os.getcwd())
+parser.add_argument("-s", "--size", type=str, default="original",
+                    help="image download size (250, 500, 1200, original)")
+parser.add_argument("release_list", metavar="RELEASES", nargs="*",
+                    help="releases to download i.e.\n3791c620-7ba4-3db0-bda8-2b060f31a7b8\nhttps://musicbrainz.org/release/3791c620-7ba4-3db0-bda8-2b060f31a7b8\nbeta.musicbrainz.org/release/3791c620-7ba4-3db0-bda8-2b060f31a7b8/discids")
 args = parser.parse_args()
 
 if __name__ == "__main__":
