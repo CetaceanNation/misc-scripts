@@ -1,6 +1,8 @@
 # vroid-hub-downloader
 Downloads preview models (viewable in the browser) from [VRoid Hub](https://hub.vroid.com/). Handles decryption and decompression (assist from bin).
 
+These decrypted models do not "just work", you will have to manually make the adjustments necessary for using them. See the comments on [this gist](https://gist.github.com/Pldare/ebf704c752a8d77ff9603d4adfe54083) for more info.
+
 ### Usage
 ```sh
 usage: vroid-hub-downloader.py [-h] [-d DIRECTORY] [--write-info-json] [vroid links/vrm files ...]
