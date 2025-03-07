@@ -250,14 +250,18 @@ def get_tweet_media(base_filepath, tweets):
 def download_media_file(tweet_url, media_url, filename):
     if os.path.isfile(filename):
         return 1
-    media_r = requests.get(media_url, headers=MEDIA_HEADERS)
-    if not media_r.ok:
-        print(f"got bad response for media '{media_url}' from '{tweet_url}'")
+    try:
+        media_r = requests.get(media_url, headers=MEDIA_HEADERS)
+        if not media_r.ok:
+            print(f"got bad response for media '{media_url}' from '{tweet_url}'")
+            return 0
+        with open(filename, "wb") as media_file:
+            media_file.write(media_r.content)
+            media_file.flush()
+        sleep(MEDIA_SLEEP_BETWEEN_DOWNLOADS)
+    except:
+        print(f"got exception for media '{media_url}' from '{tweet_url}'")
         return 0
-    with open(filename, "wb") as media_file:
-        media_file.write(media_r.content)
-        media_file.flush()
-    sleep(MEDIA_SLEEP_BETWEEN_DOWNLOADS)
     return 2 if os.path.isfile(filename) else 0
 
 
