@@ -1,17 +1,15 @@
 #!/usr/bin/env python3
 import argparse
-import json
 import os
 import re
 import requests
 from requests_toolbelt import sessions
 import shutil
 from tqdm.auto import tqdm
-import urllib.parse as urlparse
 
 VALID_THUMBS = [250, 500, 1200]
 API = "http://coverartarchive.org/release/"
-RELEASE_REGEX = r"^(?:(?:https?:\/\/)?(?:.*?\.)?musicbrainz\.org\/release\/)?(?P<release_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/.+)?$"
+RELEASE_REGEX = r"^(?:(?:https?:\/\/)?(?:.*?\.)?musicbrainz\.org\/release\/)?(?P<release_id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/.+)?(?:\?.*)?$"
 BLOCK_SIZE = 1024
 
 
@@ -23,7 +21,8 @@ def download_image(i_url, filename):
     total_size = int(file_r.headers['content-length'])
     term_width = shutil.get_terminal_size((80, 20))[0]
     with tqdm.wrapattr(open(file_path, "wb"), "write",
-                       desc=f"{filename}", bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}{postfix}]",
+                       desc=f"{filename}",
+                       bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{rate_fmt}{postfix}]",
                        ncols=int(term_width * 0.8), total=total_size,
                        unit="B", unit_scale=True, unit_divisor=BLOCK_SIZE
                        ) as file_h:
@@ -78,7 +77,8 @@ def main():
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
 parser.add_argument("-d", "--directory", type=str,
-                    help="save directory (defaults to current)", default=os.getcwd())
+                    help="save directory (defaults to current)",
+                    default=os.getcwd())
 parser.add_argument("-s", "--size", type=str, default="original",
                     help="image download size (250, 500, 1200, original)")
 parser.add_argument("release_list", metavar="RELEASES", nargs="*",
