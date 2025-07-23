@@ -6,27 +6,22 @@ from Crypto.Cipher import AES
 from datetime import datetime
 from enum import Enum
 import json
-import js2py
 import os
 import re
 import requests
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE
 import tempfile
 import urllib.parse as urlparse
 
 HOST = "https://porn3dx.com/"
+GALLERY_PATH = "/livewire/message/homepage-gallery"
 EMBED_HOST = "https://iframe.mediadelivery.net/"
-DRM_ACTIVATION_HOST = "https://video-987.mediadelivery.net/"
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/114.0"}
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0"}
 
+USER_REGEX = r".*(?P<url>porn3dx\.com\/(?P<username>\w+)).*"
 POST_REGEX = r".*(?P<url>porn3dx\.com\/post\/(?P<id>\d+)).*"
-GUID_REGEX = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-PING_TOKEN_REGEX = r";setTimeout\(function\(\)\{var\ [a-z]=\"(?P<ping_token>" + GUID_REGEX + \
-    r")\";var\ [a-z]=(?P<secret_function>function\([a-z]+\)\{.*toLowerCase\(\)\});"
-PLAYLIST_REGEX = r"https?:\/\/iframe\.mediadelivery\.net\/" + GUID_REGEX + \
-    r"\/playlist.drm\?contextId=(?P<context_id>" + \
-    GUID_REGEX + r")&secret=" + GUID_REGEX
+PLAYLIST_REGEX = r"urlPlaylistUrl\s*=\s*'(?P<url>http.*\.m3u8)'"
 
 # 7/14/2022, 3:23:37 PM
 # new Date(Date.UTC(2022, 6, 14, 15, 23, 37)).toLocaleString()
@@ -65,7 +60,8 @@ def get_arguments():
                         help="video format, specified by NAME or the keyword \'best\'", default="best")
     parser.add_argument("-F", "--list-formats",
                         action="store_true", help="list available formats")
-    parser.add_argument("posts", metavar="POSTS", nargs="*", help="post url")
+    parser.add_argument("links", metavar="LINKS",
+                        nargs="*", help="user/post url(s)")
     return parser.parse_args()
 
 # based on parts of https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/extractor/common.py
@@ -80,7 +76,6 @@ def get_m3u8_info(session, playlist_url, referer_url):
         print_log("get-m3u8-info",
                   f"failed to retrieve playlist from {playlist_url}")
     m3u8_text = m3u8_r.text
-    media_details = None
     format_details = None
     for line in m3u8_text.splitlines():
         if line.startswith("#EXT-X-STREAM-INF:"):
@@ -97,9 +92,8 @@ def get_m3u8_info(session, playlist_url, referer_url):
                                "bandwidth": format_details["BANDWIDTH"], "res": format_details["RESOLUTION"]}]
     return m3u8_info
 
+
 # https://github.com/ytdl-org/youtube-dl/blob/master/youtube_dl/utils.py#L5495
-
-
 def parse_m3u8_attributes(attrib):
     info = {}
     for (key, val) in re.findall(r'(?P<key>[A-Z0-9-]+)=(?P<val>"[^"]+"|[^",]+)(?:,|$)', attrib):
@@ -118,7 +112,7 @@ def print_formats(formats_list):
               f"{format_settings['res']:<10} ")
 
 
-def write_frag(session, frag_url, frag_name, key_context):
+def write_frag(session, post_id, frag_url, frag_name, key_context):
     try:
         with open(frag_name, "wb") as frag_file:
             video_frag_r = session.get(
@@ -131,19 +125,15 @@ def write_frag(session, frag_url, frag_name, key_context):
             frag_bytes = key_context.decrypt(video_frag_r.content)
             frag_file.write(frag_bytes)
         return True
-    except:
+    except Exception as e:
         print_log(f"dl:{post_id}",
-                  f"exception downloading video fragment '{frag_name}'")
+                  f"exception downloading video fragment '{frag_name}': {str(e)}")
         return False
 
 
-def download_stream(session, index, post_data, downloading_format, drm_session, referer_url):
+def download_stream(session, index, post_data, downloading_format, referer_url):
     post_id = post_data["id"]
     file_name = post_data["basefilename"]
-    res_name = downloading_format["name"][:-1]
-    context_id = drm_session["id"]
-    refresh_token = drm_session["token"]
-    refresh_function = drm_session["function"]
     output_file_name = f"{file_name}.{index}.mp4"
     output_file_path = os.path.abspath(
         os.path.join(args.directory, output_file_name))
@@ -157,45 +147,36 @@ def download_stream(session, index, post_data, downloading_format, drm_session, 
         return
     playlist_text = playlist_r.text
     key_context = None
-    key_count = 0
     frag_files = []
     for line in playlist_text.splitlines():
         if line.startswith("#EXT-X-KEY:"):
             # New key for decrypting fragments
             key_attr = parse_m3u8_attributes(line)
-            key_r = session.get(key_attr["URI"], headers={
+            key_url = urlparse.urlparse(downloading_format["location"])._replace(
+                path=key_attr["URI"]).geturl()
+            key_r = session.get(key_url, headers={
                                 "Origin": EMBED_HOST, "Referer": EMBED_HOST})
             if not key_r.ok:
                 print_log(f"key-context:{post_id}",
                           "failed to retrieve key for segments")
                 continue
             key_bytes = key_r.content
-            iv_bytes = bytearray.fromhex(key_attr["IV"][2:])
             print_log(
-                f"key-context:{post_id}", f"new key context [IV: {iv_bytes.hex()}, K: {key_bytes.hex()}]", LogLevel.VERBOSE)
-            key_context = AES.new(key_bytes, AES.MODE_CBC, iv_bytes)
-            key_count += 1
-            # Refresh DRM context
-            time_in_video = float(key_count)
-            refresh_string = f"{refresh_token}_{context_id}_{time_in_video}_false_{res_name}"
-            refresh_hash = refresh_function(refresh_string)
-            refresh_url = DRM_ACTIVATION_HOST + \
-                f".drm/{context_id}/ping?hash={refresh_hash}&time={time_in_video}&paused=false&resolution={res_name}"
-            print_log(
-                f"drm:{post_id}", f"refreshing session; {refresh_url}", LogLevel.VERBOSE)
-            refresh_r = session.get(refresh_url, headers={
-                                    "Origin": EMBED_HOST, "Referer": EMBED_HOST})
-            if not refresh_r.ok:
-                print_log(
-                    f"drm:{post_id}", "failed to refresh the drm session, will continue but likely to fail if the video is long")
+                f"key-context:{post_id}", f"new key context [K: {key_bytes.hex()}]", LogLevel.VERBOSE)
+            key_context = AES.new(key_bytes, AES.MODE_CBC)
         elif not line.startswith("#"):
             # Write the fragment
             frag_file_name = os.path.abspath(os.path.join(
                 args.directory, f"{file_name}.{index}.{len(frag_files)}.ts"))
-            if write_frag(session, line, frag_file_name, key_context):
+            frag_url = urlparse.urljoin(
+                downloading_format["location"], line.strip())
+            if write_frag(session, post_id, frag_url, frag_file_name, key_context):
                 frag_files.append(frag_file_name)
+            else:
+                return
     # Use ffmpeg to concatenate all the fragments into a single output file
-    print_log(f"mpeg-convert:{post_id}", f"merging fragments")
+    print_log(f"mpeg-convert:{post_id}",
+              f"merging {len(frag_files)} fragments")
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt") as frag_list:
         for frag_name in frag_files:
             frag_list.write(f"file '{frag_name}'\n")
@@ -240,34 +221,13 @@ def download_video(session, index, post_data, content_soup):
         print_log(f"info:{post_id}",
                   "could not find format playlist url in embed")
         return
-    playlist_url = playlist_m.group(0)
-    context_id = playlist_m.group("context_id")
+    playlist_url = playlist_m.group("url")
     # Get available formats
     formats_list = get_m3u8_info(session, playlist_url, iframe_url)
     if args.list_formats:
         print_log(f"info:{post_id}", "available formats:")
         print_formats(formats_list)
         return
-    # Activate DRM session
-    drm_session = {}
-    activation_url = urlparse.urljoin(
-        DRM_ACTIVATION_HOST, f".drm/{context_id}/activate")
-    if not session.get(activation_url, headers={"Origin": EMBED_HOST, "Referer": EMBED_HOST}).ok:
-        print_log(
-            f"drm:{post_id}", "failed to activate drm context, download will not proceed")
-        return
-    print_log(f"drm:{post_id}",
-              f"activated drm context {context_id}", LogLevel.VERBOSE)
-    drm_session["id"] = context_id
-    # Extract refresh token from embed script
-    token_m = re.search(PING_TOKEN_REGEX, iframe_script)
-    if not token_m:
-        print_log(f"drm:{post_id}",
-                  "could not find ping refresh token in embed")
-        return
-    drm_session["token"] = token_m.group("ping_token")
-    secret_script = token_m.group("secret_function")
-    drm_session["function"] = js2py.eval_js(secret_script)
     # Select preferred format
     downloading_format = None
     best_bitrate = 0
@@ -287,7 +247,7 @@ def download_video(session, index, post_data, content_soup):
         playlist_url, format_settings["location"])
     format_name = downloading_format["name"]
     print_log(f"info:{post_id}", f"downloading format {format_name}")
-    return download_stream(session, index, post_data, downloading_format, drm_session, iframe_url)
+    return download_stream(session, index, post_data, downloading_format, iframe_url)
 
 
 def download_image(session, index, post_data, content_soup):
@@ -427,19 +387,76 @@ def download_post(session, post_id, post_url):
         content_index += 1
 
 
+def download_user(session, username, user_url):
+    print_log(f"info:{username}", "retrieving user page")
+    user_page_r = session.get(user_url)
+    if not user_page_r.ok:
+        print_log(f"info:{username}", "failed to retrieve user page")
+        return
+    user_soup = bs(user_page_r.content, "html.parser")
+    csrf_token = user_soup.find(
+        "meta", attrs={"name": "csrf-token"})["content"]
+    gallery = user_soup.find("div", id="homepage-gallery")
+    if not gallery:
+        print_log(f"info:{username}", "could not find user gallery")
+        return
+    wire_element = gallery.find_all("div", "main-gallery")[0]
+    wire_data = json.loads(wire_element["wire:initial-data"])
+    fingerprint = wire_data["fingerprint"]
+    page_count = 1
+    while "endOfFile" not in wire_data["serverMemo"]["data"] or not wire_data["serverMemo"]["data"]["endOfFile"] == "true":
+        page_count += 1
+        _ = wire_data.pop("effects")
+        wire_data["updates"] = [
+            {
+                "payload": {
+                    "id": "fake",
+                    "method": "loadMoreGallery",
+                    "params": []
+                },
+                "type": "callMethod"
+            }
+        ]
+        gallery_r = session.post(urlparse.urljoin(HOST, GALLERY_PATH),
+                                 data=json.dumps(wire_data),
+                                 headers={"X-CSRF-TOKEN": csrf_token, "X-Livewire": "true", "Referer": user_url})
+        if not gallery_r.ok:
+            print_log(f"info:{username}",
+                      f"failed to retrieve paged user gallery, got status {gallery_r.status_code} requesting page {page_count}")
+            page_count -= 1
+            break
+        wire_data = json.loads(gallery_r.text)
+        wire_data["fingerprint"] = fingerprint
+    post_links = [urlparse.urljoin(HOST, f"post/{x['id']}/{x['slug']}")
+                  for x in wire_data["serverMemo"]["data"]["images"]]
+    if not post_links:
+        print_log(f"info:{username}", "no posts found in user gallery")
+        return
+    print_log(f"info:{username}",
+              f"found {len(post_links)} posts in user gallery ({page_count} pages)")
+    for index, post_link in enumerate(post_links):
+        download_post(session, post_link.split("/")[-1], post_link)
+
+
 def main():
-    if len(args.posts) == 0:
+    if len(args.links) == 0:
         parser.print_usage()
         return
     elif not os.path.isdir(args.directory):
         os.makedirs(args.directory)
     s = requests.Session()
     s.headers = HEADERS
-    for post in args.posts:
-        url_m = re.search(POST_REGEX, post)
+    for link in args.links:
+        url_m = re.search(POST_REGEX, link)
         if url_m:
             post_url = "https://" + url_m.group("url")
             download_post(s, url_m.group("id"), post_url)
+            continue
+        url_m = re.search(USER_REGEX, link)
+        if url_m:
+            user_url = "https://" + url_m.group("url")
+            download_user(s, url_m.group("username"), user_url)
+            continue
 
 
 parser = argparse.ArgumentParser()

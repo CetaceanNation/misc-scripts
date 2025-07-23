@@ -1,4 +1,3 @@
 bs4
 datetime
-js2py
 requests
