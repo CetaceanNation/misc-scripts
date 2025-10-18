@@ -198,7 +198,7 @@ def download_stream(session, index, post_data, downloading_format, referer_url):
         for frag_name in frag_files:
             os.remove(frag_name)
         return output_file_path, post_data
-    print_log(f"mpeg-convert:{post_id}", "could not find output file")
+    print_log(f"mpeg-convert:{post_id}", f"could not find output file {output_file_path}")
     return
 
 
