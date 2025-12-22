@@ -15,6 +15,9 @@ BLOCK_SIZE = 1024
 
 def download_image(i_url, filename):
     file_path = os.path.join(args.directory, filename)
+    if args.skip_existing and os.path.isfile(file_path):
+        print(f"skipping existing file {filename}")
+        return
     file_r = requests.get(i_url, stream=True, allow_redirects=True)
     if not file_r.ok:
         print(f"could not get art for {filename}")
@@ -81,6 +84,8 @@ parser.add_argument("-d", "--directory", type=str,
                     default=os.getcwd())
 parser.add_argument("-s", "--size", type=str, default="original",
                     help="image download size (250, 500, 1200, original)")
+parser.add_argument("-e", "--skip-existing", action="store_true",
+                    help="skip downloading files that already exist")
 parser.add_argument("release_list", metavar="RELEASES", nargs="*",
                     help="releases to download i.e.\n3791c620-7ba4-3db0-bda8-2b060f31a7b8\nhttps://musicbrainz.org/release/3791c620-7ba4-3db0-bda8-2b060f31a7b8\nbeta.musicbrainz.org/release/3791c620-7ba4-3db0-bda8-2b060f31a7b8/discids")
 args = parser.parse_args()
