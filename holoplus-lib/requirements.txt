@@ -1,0 +1,3 @@
+httpx==0.28.1
+nodriver==0.48.1
+screeninfo==0.8.1
