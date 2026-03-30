@@ -13,6 +13,14 @@ options:
                         Browser cookies if you've already authenticated on account.hololive.net
 ```
 
+### CLI Example
+```sh
+# Authenticate to create token (token doesn't exist, will start Chromium browser for login)
+python -m holoplus_lib --token my-token.json
+# Authenticate to create token (token doesn't exist, will use cookies for authentication with account.hololive.net)
+python -m holoplus_lib --token my-token.json --cookies my-cookies.txt
+```
+
 ### Library Example
 ```python
 import asyncio
