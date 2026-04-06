@@ -331,7 +331,7 @@ def get_post_data(post_id, soup):
     date_values = list(map(int, date_text_m.group(1).split(", ")))
     post_data["timestamp"] = int(datetime(date_values[0], (date_values[1] % 11) + 1,
                                           date_values[2], date_values[3], date_values[4], date_values[5]).timestamp())
-    tag_block = post_meta_divs[1].find_all("div", recursive=False)[1]
+    tag_block = post_meta_divs[1].find_all("div", recursive=False)[0]
     for tag_link in tag_block.find_all("a", recursive=False):
         tag_category = ""
         tag_text = tag_link.string.strip()
