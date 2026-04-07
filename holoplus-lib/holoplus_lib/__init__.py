@@ -169,7 +169,7 @@ class Holoplus():
 
     async def request(self, url: str, method: str = "GET", **kwargs) -> Optional[dict]:
         if self.auth.is_valid() and self.auth.is_expired():
-            self.refresh_token()
+            await self.refresh_token()
         request_headers = self.headers.copy()
         request_headers.update(kwargs.pop("headers", {}))
         log.debug(f"Requesting '{url}'")

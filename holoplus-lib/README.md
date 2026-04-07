@@ -8,6 +8,7 @@ usage: python -m holoplus_lib [-h] [--debug] [--token TOKEN_FILE] [--cookies COO
 options:
   -h, --help            show this help message and exit
   --debug               Print debug messages
+  --interactive         Start interactive prompt
   --token TOKEN_FILE    File to read/save token information to/from
   --cookies COOKIES_FILE
                         Browser cookies if you've already authenticated on account.hololive.net
