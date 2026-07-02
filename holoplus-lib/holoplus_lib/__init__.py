@@ -32,7 +32,7 @@ GOOGLE_API = "https://www.googleapis.com/identitytoolkit/v3/relyingparty"
 GOOGLE_API_KEY = "AIzaSyBIBy1CboBwrCShfY1CixfRRynJRF06vx0"
 GOOGLE_REFRESH_API = "https://securetoken.googleapis.com/v1/token"
 HOLOPLUS_HEADERS = {
-    "app-version": "3.4.2 (215)",
+    "app-version": "3.7.0 (219)",
     "content-type": "text/plain; charset=utf-8",
     "release-type": "app_data",
     "user-agent": "Dart/3.10 (dart:io)"
